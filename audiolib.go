@@ -14,7 +14,7 @@ var (
 	staticFS    fs.FS
 	webTemplate *template.Template
 	db          *Database
-	taskCh      = make(chan Task)
+	taskCh      = make(chan TaskEntry)
 	version     = "0.0.1"
 	port        string
 )
@@ -40,8 +40,7 @@ func main() {
 	log.SetFlags(log.Lshortfile)
 	log.SetFlags(0)
 	log.SetOutput(db)
-	log.Println("**application started**")
-	log.Printf("**version %v**", version)
+	log.Printf("application started, version %v", version)
 	//
 	go runHTTP()
 	//
@@ -57,4 +56,5 @@ func main() {
 
 		}
 	}
+
 }

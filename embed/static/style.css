@@ -14,6 +14,9 @@ body{
 
 #content{
 	grid-area:content;
+	max-height:calc(100vh - 54px);
+	overflow-y:scroll;
+	overflow-x:hidden;
 }
 #toolbar{
 	background-color:#0e0e0e;
@@ -40,7 +43,7 @@ body{
 	border:none;
 	border-radius:5px;
 	cursor:pointer;
-	margin:2px 4px;
+	margin:3px 4px;
 	width:36px;
 	height:36px;
 	display:flex;
@@ -50,6 +53,9 @@ body{
 }
 .icon-button:hover{
 	background-color:#fff2;
+	color:#fa0;
+}
+.icon-button.active{
 	color:#fa0;
 }
 .icon-button.circle{
@@ -62,9 +68,9 @@ body{
 
 .horizontal-flex-separator{
 	height:1px;
-	background-color:#aaa;
+	background-color:#999;
 	align-self:stretch;
-	margin:4px 0;
+	margin:0 6px;
 }
 
 input[type="search"] {
@@ -74,13 +80,49 @@ input[type="search"] {
 	transition:all 0.1s ease-in-out;
 	border-radius:5px;
 	padding:5px;
+	border-color:#444;
 }
 
 input[type="search"]:focus {
 	background-color:#4e4e4e;
 }
 
+#content.logs{
+	display:flex;
+	flex-direction:column;
+	align-items:center;
+}
+#content.logs .log{
+	padding:10px 8px;
+	line-height:1.5rem;
+	margin:0;
+	max-width:1000px;
+}
+#content.logs .log .created{
+	color:#aaa;
+	font-size:0.9rem;
+	font-weight:600;
+}
+#content.logs .log .message{
+	font-size:1.0rem;
+	font-weight:400;
+}
+table{
+	border-collapse:collapse;
+	width:100%;
+	margin:10px 20px;
+}
+
+th, td {
+	padding:13px;
+	text-align:left;
+	border-bottom:1px solid #888;
+	line-height:14px;
+}
 
 @media (max-width:800px) {
-
+	body{
+		grid-template-rows:36px auto;
+		grid-template-columns:36px auto;
+	}
 }
