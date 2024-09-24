@@ -57,7 +57,8 @@ CREATE TABLE audiobooks_files (
 CREATE TABLE libraries (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    paths JSONB,
+    import_path TEXT NOT NULL,
+    converted_path TEXT NOT NULL,
     created DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

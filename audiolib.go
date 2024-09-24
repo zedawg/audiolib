@@ -3,20 +3,15 @@ package main
 import (
 	"embed"
 	"flag"
-	"html/template"
-	"io/fs"
 	"log"
 )
 
 var (
 	//go:embed embed
-	embedFS     embed.FS
-	staticFS    fs.FS
-	webTemplate *template.Template
-	db          *Database
-	taskCh      = make(chan TaskEntry)
-	version     = "0.0.1"
-	port        string
+	embedFS embed.FS
+	db      *Database
+	version = "0.0.1"
+	port    string
 )
 
 func init() {
@@ -45,16 +40,8 @@ func main() {
 	go runHTTP()
 	//
 	for {
-		t := <-taskCh
-		switch t.Name {
-		case "scan":
-		case "match":
-		case "shutdown":
-			log.Println("application shutdown")
-			return
-		default:
-
-		}
+		c := make(chan bool)
+		<-c
 	}
 
 }

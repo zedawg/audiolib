@@ -3,77 +3,90 @@ package main
 import (
 	"fmt"
 	"html/template"
-	"io/fs"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
+)
+
+var (
+	templateCache    *template.Template
+	useTemplateCache = false
 )
 
 func runHTTP() {
+	// staticFS, err := fs.Sub(embedFS, "embed/static")
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// http.Handle("/static/", http.StripPrefix("/static/", http.FileServerFS(staticFS)))
 	var err error
-	if staticFS, err = fs.Sub(embedFS, "embed/static"); err != nil {
-		log.Fatal(err)
-	}
-	if webTemplate, err = template.ParseFS(embedFS, "embed/templates/**"); err != nil {
-		log.Fatal(err)
-	}
-	if len(webTemplate.Templates()) == 0 {
-		log.Fatal("web templates not found ")
+	templateCache, err = template.ParseFS(embedFS, "embed/templates/**")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
-	http.Handle("/static/", http.StripPrefix("/static/", http.FileServerFS(staticFS)))
-	http.Handle("/", &HomeHandler{})
-	http.Handle("/logs", &LogsHandler{})
-	http.Handle("/tasks", &TasksHandler{})
-	http.Handle("/settings", &SettingsHandler{})
-	http.Handle("/user", &UserHandler{})
+	http.Handle("GET /static/", &FileHandler{})
+	http.Handle("GET /{$}", &HomeHandler{})
+	http.Handle("GET /activities", &ActivitiesHandler{})
+	http.Handle("GET /settings", &SettingsHandler{})
+	http.Handle("GET /user", &UserHandler{})
+	http.Handle("POST /library", &CreateLibraryHandler{})
+	http.Handle("POST /search", &SearchHandler{})
 
 	if err := http.ListenAndServe(port, nil); err != nil {
 		log.Println(err)
 	}
 }
 
-type HomeHandler struct {
+func executeTemplate(w http.ResponseWriter, name string, data any) error {
+	if useTemplateCache && templateCache != nil {
+		return templateCache.ExecuteTemplate(w, name, data)
+	}
+	t, err := template.ParseGlob("embed/templates/*")
+	if err != nil {
+		return err
+	}
+	return t.ExecuteTemplate(w, name, data)
 }
+
+type FileHandler struct{}
+
+func (h *FileHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-cache")
+	p := filepath.Join("embed", r.URL.Path)
+	http.ServeFile(w, r, p)
+}
+
+type HomeHandler struct{}
 
 func (h *HomeHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	data := struct{}{}
-	var err error
-	err = webTemplate.ExecuteTemplate(w, "page-home.html.tpl", data)
-	if err != nil {
+	data := struct {
+		Name string
+	}{
+		Name: "home",
+	}
+	if err := executeTemplate(w, "pages.home", data); err != nil {
 		fmt.Println(err)
 	}
 }
 
-type LogsHandler struct{}
+type ActivitiesHandler struct{}
 
-func (h *LogsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (h *ActivitiesHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	data := struct {
-		Logs []*LogEntry
-	}{}
+		Name       string
+		Activities []*ActivityEntry
+	}{
+		Name: "activities",
+	}
 	var err error
-	data.Logs, err = db.GetLogs(100, 0)
+	data.Activities, err = db.GetActivities(100, 0)
 	if err != nil {
 		fmt.Println(err)
 	}
-	err = webTemplate.ExecuteTemplate(w, "page-logs.html.tpl", data)
-	if err != nil {
-		fmt.Println(err)
-	}
-}
-
-type TasksHandler struct{}
-
-func (h *TasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	data := struct {
-		Tasks []*TaskEntry
-	}{}
-	var err error
-	data.Tasks, err = db.GetTasks(100, 0)
-	if err != nil {
-		fmt.Println(err)
-	}
-	err = webTemplate.ExecuteTemplate(w, "page-tasks.html.tpl", data)
-	if err != nil {
+	if err = executeTemplate(w, "pages.activities", data); err != nil {
 		fmt.Println(err)
 	}
 }
@@ -81,10 +94,18 @@ func (h *TasksHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type SettingsHandler struct{}
 
 func (h *SettingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	data := struct{}{}
+	data := struct {
+		Name      string
+		Libraries []*LibraryEntry
+	}{
+		Name: "settings",
+	}
 	var err error
-	err = webTemplate.ExecuteTemplate(w, "page-settings.html.tpl", data)
+	data.Libraries, err = db.GetLibraries()
 	if err != nil {
+		fmt.Println(err)
+	}
+	if err = executeTemplate(w, "pages.settings", data); err != nil {
 		fmt.Println(err)
 	}
 }
@@ -92,10 +113,76 @@ func (h *SettingsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type UserHandler struct{}
 
 func (h *UserHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	data := struct{}{}
+	data := struct {
+		Name string
+	}{
+		Name: "user",
+	}
 	var err error
-	err = webTemplate.ExecuteTemplate(w, "page-user.html.tpl", data)
+	if err = executeTemplate(w, "pages.user", data); err != nil {
+		fmt.Println(err)
+	}
+}
+
+type SearchHandler struct{}
+
+func (h *SearchHandler) escape(q string) string {
+	return q
+}
+
+func (h *SearchHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	data := struct {
+		Query         string
+		SearchResults []*SearchResultEntry
+	}{
+		Query: h.escape(r.FormValue("search")),
+	}
+	var err error
+	if len(data.Query) > 2 {
+		data.SearchResults, err = db.Search(data.Query)
+		if err != nil {
+			fmt.Println(err)
+		}
+		for i := 0; i < 20; i++ {
+			data.SearchResults = append(data.SearchResults, &SearchResultEntry{
+				ID:      i,
+				Name:    fmt.Sprintf("name %v", i),
+				Type:    fmt.Sprintf("type %v", i),
+				Details: fmt.Sprintf("details %v", i),
+				Image:   "/static/nocover.jpg",
+			})
+		}
+	}
+	if err = executeTemplate(w, "search-results", data); err != nil {
+		fmt.Println(err)
+	}
+}
+
+type CreateLibraryHandler struct{}
+
+func (h *CreateLibraryHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if err := db.CreateLibrary(r.FormValue("name"), r.FormValue("import_path"), r.FormValue("converted_path")); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+	data := struct {
+		Libraries []*LibraryEntry
+	}{}
+	var err error
+	data.Libraries, err = db.GetLibraries()
 	if err != nil {
 		fmt.Println(err)
 	}
+	// w.Header().Set("Hx-Trigger", `{"closeModal": {}}`)
+	w.Header().Set("Hx-Trigger", `closeModal`)
+	if err = executeTemplate(w, "libraries", data.Libraries); err != nil {
+		fmt.Println(err)
+	}
+}
+
+func (h *CreateLibraryHandler) validateLibrary(r *http.Request) error {
+	var (
+		name          = r.FormValue("name")
+		importPath    = r.FormValue("import_path")
+		convertedPath = r.FormValue("converted_path")
+	)
 }
