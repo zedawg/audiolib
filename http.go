@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 	"path"
+	"strconv"
 
+	"github.com/zedawg/audiolib/config"
 	"github.com/zedawg/audiolib/db"
 )
 
@@ -15,7 +17,7 @@ var (
 )
 
 func executeTemplate(w http.ResponseWriter, name string, data any) (err error) {
-	if dev {
+	if DEV {
 		t, err := template.ParseGlob("templates/*")
 		if err != nil {
 			return err
@@ -28,38 +30,48 @@ func executeTemplate(w http.ResponseWriter, name string, data any) (err error) {
 	return tpl.ExecuteTemplate(w, name, data)
 }
 
+func getParam(r *http.Request, name, defaultValue string) string {
+	v := r.URL.Query().Get(name)
+	if len(v) == 0 {
+		return defaultValue
+	}
+	return v
+}
+
 func StartHTTP() {
-	if dev {
-		http.HandleFunc("GET /assets/", http.HandlerFunc(ServeFileHandlerFunc))
-		http.HandleFunc("GET /public/", http.HandlerFunc(ServeFileHandlerFunc))
+	if DEV {
+		http.HandleFunc("GET /assets/", http.HandlerFunc(DevFileHandlerFunc))
+		http.HandleFunc("GET /public/", http.HandlerFunc(DevFileHandlerFunc))
 	} else {
 		http.Handle("GET /assets/", http.FileServer(http.FS(AssetsFS)))
 		http.Handle("GET /public/", http.FileServer(http.FS(PublicFS)))
 	}
-	http.Handle("GET /{$}", http.HandlerFunc(AudiobooksHandlerFunc))
+	http.Handle("GET /{$}", http.HandlerFunc(BooksHandlerFunc))
 	http.Handle("GET /tasks", http.HandlerFunc(TasksHandlerFunc))
 	http.Handle("GET /settings", http.HandlerFunc(SettingsHandlerFunc))
 	http.Handle("GET /user", http.HandlerFunc(UserHandlerFunc))
-	http.Handle("POST /libraries", http.HandlerFunc(CreateLibraryHandlerFunc))
 	http.Handle("POST /search", http.HandlerFunc(SearchHandlerFunc))
-	http.Handle("PUT /libraries", http.HandlerFunc(UpdateLibraryHandlerFunc))
 
-	if err := http.ListenAndServe(Port, nil); err != nil {
+	if err := http.ListenAndServe(config.C.Port, nil); err != nil {
 		log.Println(err)
 	}
 }
 
-func ServeFileHandlerFunc(w http.ResponseWriter, r *http.Request) {
+func DevFileHandlerFunc(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	http.ServeFile(w, r, path.Join(".", r.URL.Path))
 }
 
-func AudiobooksHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	audiobooks, err := db.GetAudiobooks()
+func BooksHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	sort := getParam(r, "sort", "added")
+	limit, _ := strconv.Atoi(getParam(r, "limit", "100"))
+	offset, _ := strconv.Atoi(getParam(r, "offset", "0"))
+
+	books, err := db.GetBooks(sort, limit, offset)
 	if err != nil {
 		log.Println(err)
 	}
-	if err := executeTemplate(w, "pages.audiobooks", audiobooks); err != nil {
+	if err := executeTemplate(w, "pages.books", books); err != nil {
 		fmt.Println(err)
 	}
 }
@@ -75,11 +87,7 @@ func TasksHandlerFunc(w http.ResponseWriter, r *http.Request) {
 }
 
 func SettingsHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	libraries, err := db.GetLibraries()
-	if err != nil {
-		log.Println(err)
-	}
-	if err = executeTemplate(w, "pages.settings", libraries); err != nil {
+	if err := executeTemplate(w, "pages.settings", struct{}{}); err != nil {
 		log.Println(err)
 	}
 }
@@ -107,12 +115,12 @@ func SearchHandlerFunc(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	results, err := db.Search(q)
+	results, err := db.SearchBooks(q)
 	if err != nil {
 		log.Println(err)
 	}
 	for i := 0; i < 20; i++ {
-		results = append(results, &db.Audiobook{ID: i, Title: fmt.Sprintf("title %v", i), Authors: fmt.Sprintf("authors %v", i)})
+		results = append(results, &db.Book{ID: i, Title: fmt.Sprintf("title %v", i), Author: fmt.Sprintf("authors %v", i)})
 	}
 
 	if err = executeTemplate(w, "search-results", results); err != nil {
@@ -121,15 +129,8 @@ func SearchHandlerFunc(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateLibraryHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	if err := db.CreateLibrary(r.FormValue("name"), r.FormValue("import_path"), r.FormValue("converted_path")); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	}
-	libraries, err := db.GetLibraries()
-	if err != nil {
-		log.Println(err)
-	}
 	w.Header().Set("Hx-Trigger", `closeModal`)
-	if err = executeTemplate(w, "libraries", libraries); err != nil {
+	if err := executeTemplate(w, "libraries", struct{}{}); err != nil {
 		log.Println(err)
 	}
 }

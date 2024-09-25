@@ -4,13 +4,12 @@ import (
 	"database/sql"
 
 	"github.com/mattn/go-sqlite3"
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/zedawg/audiolib/config"
 )
 
 var (
-	DB   *sql.DB
-	Name string
-	C    = make(chan Message)
+	DB *sql.DB
+	C  = make(chan Message)
 )
 
 type Message struct {
@@ -22,7 +21,7 @@ type Message struct {
 
 func Connect() (err error) {
 	registerDriver()
-	DB, err = sql.Open("sqlite3_driver", Name)
+	DB, err = sql.Open("sqlite3_driver", config.C.Database)
 	return err
 }
 

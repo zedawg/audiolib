@@ -18,7 +18,7 @@ CREATE TABLE files (
 CREATE TABLE books (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT COLLATE NOCASE NOT NULL,
-    authors TEXT COLLATE NOCASE,
+    author TEXT COLLATE NOCASE,
     narrator TEXT COLLATE NOCASE,
     isbn TEXT COLLATE NOCASE,
     asin TEXT COLLATE NOCASE,
@@ -27,6 +27,7 @@ CREATE TABLE books (
     year INTEGER,
     duration INTEGER,
     chapters JSONB,
+    provider TEXT,
     added DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 

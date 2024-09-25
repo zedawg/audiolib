@@ -4,7 +4,10 @@ import (
 	"embed"
 	"flag"
 	"log"
+	"os"
+	"path"
 
+	"github.com/zedawg/audiolib/config"
 	"github.com/zedawg/audiolib/db"
 )
 
@@ -20,30 +23,47 @@ var (
 )
 
 var (
-	Port    string
-	Version = "0.0.1"
-	dev     bool
+	VERSION = "0.0.1"
+	DEV     bool
 )
 
 func init() {
-	//
-	flag.StringVar(&Port, "port", ":8080", "client http port")
-	flag.StringVar(&db.Name, "db", "audiolib.db", "sqlite database file path")
-	flag.BoolVar(&dev, "dev", false, "development mode")
+	flag.BoolVar(&DEV, "dev", false, "development mode")
+	flag.StringVar(&config.Name, "config", "audiolib.config", "config json")
 	flag.Parse()
+
+	wd, _ := os.Getwd()
+	if !path.IsAbs(config.Name) {
+		config.Name = path.Join(wd, config.Name)
+	}
+	if _, err := os.Lstat(config.Name); err != nil {
+		if err = config.UseDefault(); err != nil {
+			log.Fatal(err)
+		}
+	}
+	if err := config.Parse(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func main() {
-	if err := db.Connect(); err != nil {
+	err := db.Connect()
+	if err != nil {
 		log.Fatal(err)
 	}
 	defer db.Close()
 	b, _ := SQLFS.ReadFile("db/schema.sql")
 	db.DB.Exec(string(b))
 	//
-	log.Println("version:", Version)
-	log.Println("dev:", dev)
-	log.SetFlags(log.Lshortfile)
+	log.SetFlags(0)
+	log.Println("config:", config.Name)
+	log.Println("database:", config.C.Database)
+	log.Println("app port:", config.C.Port)
+	log.Println("version:", VERSION)
+	log.Println("dev:", DEV)
+	if DEV {
+		log.SetFlags(log.Lshortfile)
+	}
 	//
 	go StartHTTP()
 	//
