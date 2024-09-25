@@ -1,50 +1,131 @@
-package main
+package db
 
-func (db *Database) GetLibraries() (libraryEntries []*LibraryEntry, err error) {
-	rows, err := db.Query(`SELECT id, name, import_path, converted_path, created FROM libraries ORDER BY created DESC`)
+import (
+	"log"
+	"time"
+)
+
+type Library struct {
+	ID            int
+	Name          string
+	ScanPath      string
+	ConvertedPath string
+	Created       time.Time
+}
+
+func GetLibraries() (libraries []*Library, err error) {
+	rows, err := DB.Query(`SELECT id, name, import_path, converted_path, created FROM libraries ORDER BY created DESC`)
 	if err != nil {
 		return
 	}
 	for rows.Next() {
-		l := LibraryEntry{}
+		l := Library{}
 		if err = rows.Scan(&l.ID, &l.Name, &l.ImportPath, &l.ConvertedPath, &l.Created); err != nil {
 			return
 		}
-		libraryEntries = append(libraryEntries, &l)
+		libraries = append(libraries, &l)
 	}
 	return
 }
 
-func (db *Database) GetActivities(limit, offset int) (activityEntries []*ActivityEntry, err error) {
-	rows, err := db.Query(`
-SELECT created, message AS value, 'log' AS type FROM logs UNION ALL
-SELECT created, (name || ' ' || params || ' ' || result) AS value, 'task' AS type FROM tasks
+func CreateLibrary(name, importPath, convertedPath string) error {
+	_, err := DB.Exec(`
+INSERT INTO libraries (name, import_path, converted_path)
+VALUES (?,?,?)`, name, importPath, convertedPath)
+	return err
+}
+
+type Audiobook struct {
+	ID       int
+	Title    string
+	Subtitle string
+	Authors  string
+	Narrator string
+	Genre    string
+	ISBN     string
+	ASIN     string
+	Language string
+	Year     int
+	Duration int
+	Chapters string
+	Created  time.Time
+}
+
+func GetAudiobooks() (audiobooks []*Audiobook, err error) {
+	rows, err := DB.Query(`
+SELECT id, title, subtitle, authors, narrator, genre, isbn, asin, language, year, duration, chapters, created
+FROM audiobooks`)
+	if err != nil {
+		return
+	}
+	for rows.Next() {
+		v := Audiobook{}
+		if err := rows.Scan(&v.ID, &v.Title, &v.Subtitle, &v.Authors, &v.Narrator, &v.Genre, &v.ISBN, &v.ASIN, &v.Language, &v.Year, &v.Duration, &v.Chapters, &v.Created); err != nil {
+			log.Println(err)
+		}
+		audiobooks = append(audiobooks, &v)
+	}
+	return
+}
+
+type Task struct {
+	ID       int
+	Name     string
+	Priority int
+	Status   string
+	Params   string
+	Result   string
+	Created  time.Time
+}
+
+func GetTasks(limit, offset int) (tasks []*Task, err error) {
+	rows, err := DB.Query(`
+SELECT id, name, priority, status, params, result, created
+FROM tasks
 ORDER BY created LIMIT ? OFFSET ?`, limit, offset)
 	if err != nil {
 		return
 	}
 	for rows.Next() {
-		a := ActivityEntry{}
-		if err = rows.Scan(&a.Created, &a.Value, &a.Type); err != nil {
+		v := Task{}
+		if err = rows.Scan(&v.ID, &v.Name, &v.Priority, &v.Status, &v.Params, &v.Result, &v.Created); err != nil {
 			return
 		}
-		activityEntries = append(activityEntries, &a)
+		tasks = append(tasks, &v)
 	}
 	return
-
 }
 
-func (db *Database) Search(q string) (searchResults []*SearchResultEntry, err error) {
-	rows, err := db.Query(`
-SELECT 
-	id, name, details, image, 'audiobook' AS type 
-FROM audiobooks`)
+func Search(q string) (results []*Audiobook, err error) {
+	q = q + "%"
+	rows, err := DB.Query(`
+SELECT id, title, subtitle, authors, narrator, genre, isbn, asin, language, year, duration, chapters, created
+FROM audiobooks
+WHERE title LIKE ? OR subtitle LIKE ? OR authors LIKE ? OR isbn LIKE ? OR asin LIKE ?`, q, q, q, q, q)
+	if err != nil {
+		return
+	}
+	for rows.Next() {
+		v := Audiobook{}
+		if err := rows.Scan(&v.ID, &v.Title, &v.Subtitle, &v.Authors, &v.Narrator, &v.Genre, &v.ISBN, &v.ASIN, &v.Language, &v.Year, &v.Duration, &v.Chapters, &v.Created); err != nil {
+			log.Println(err)
+		}
+		results = append(results, &v)
+	}
 	return
 }
 
-func (db *Database) CreateLibrary(name, importPath, convertedPath string) error {
-	_, err := db.Exec(`
-INSERT INTO libraries (name, import_path, converted_path)
-VALUES (?,?,?)`, name, importPath, convertedPath)
-	return err
+type File struct {
+	ID       int
+	Name     string
+	Created  time.Time
+	Modified time.Time
+	TaskID   int
+}
+
+type User struct {
+	ID           int
+	Name         string
+	PasswordHash string
+	IsAdmin      bool
 }

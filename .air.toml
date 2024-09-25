@@ -3,7 +3,7 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = ["-d tmp/audiolib.dev.db -p :8000"]
+  args_bin = ["--db tmp/audiolib.dev.db --port :8000 --dev"]
   bin = "./tmp/main"
   cmd = "go build -o ./tmp/main ."
   delay = 1000

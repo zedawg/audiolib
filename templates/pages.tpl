@@ -1,50 +1,49 @@
 {{ define "head" }}
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-<!-- <link rel="icon" type="image/x-icon" href="/static/favicon.ico"> -->
-<link rel="stylesheet" href="/static/style.css">
-<script src="/static/htmx.min.js"></script>
-<script>{{ template "script.js" . }}</script>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+	<link rel="stylesheet" href="/assets/style.css">
+	<script src="/assets/htmx.min.js"></script>
+	<script src="/assets/script.js"></script>
 </head>
 {{ end }}
 
-{{ define "pages.home" }}
-{{ template "head" . }}
-<body>
-{{ template "toolbar.tpl" . }}
-{{ template "home.tpl" . }}
-</body>
+{{ define "pages.audiobooks" }}
+	{{ template "head" . }}
+	<body name="audiobooks">
+		{{ template "toolbar.tpl" . }}
+		{{ template "audiobooks.tpl" . }}
+	</body>
 {{ end }}
 
-{{ define "pages.activities"}}
-{{ template "head" . }}
-<body>
-{{ template "toolbar.tpl" . }}
-{{ template "activities.tpl" . }}
-</body>
+{{ define "pages.tasks"}}
+	{{ template "head" . }}
+	<body name="tasks">
+		{{ template "toolbar.tpl" . }}
+		{{ template "tasks.tpl" . }}
+	</body>
 {{ end }}
 
 {{ define "pages.settings"}}
-{{ template "head" . }}
-<body>
-{{ template "toolbar.tpl" . }}
-{{ template "settings-content" . }}
-</body>
+	{{ template "head" . }}
+	<body name="settings">
+		{{ template "toolbar.tpl" . }}
+		{{ template "settings-content" . }}
+	</body>
 {{ end }}
 
 {{ define "pages.user"}}
-{{ template "head" . }}
-<body>
-{{ template "toolbar.tpl" . }}
-{{ template "user.tpl" . }}
-</body>
+	{{ template "head" . }}
+	<body name="user">
+		{{ template "toolbar.tpl" . }}
+		{{ template "user.tpl" . }}
+	</body>
 {{ end }}
 
 {{ define "pages.new_library" }}
-{{ template "head" . }}
-<body>
-{{ template "toolbar.tpl" . }}
-{{ template "new_library.tpl" . }}
-</body>
+	{{ template "head" . }}
+	<body name="new-library">
+		{{ template "toolbar.tpl" . }}
+		{{ template "new_library.tpl" . }}
+	</body>
 {{ end }}

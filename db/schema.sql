@@ -1,92 +1,64 @@
 CREATE TABLE tasks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    priority INTEGER NOT NULL DEFAULT 0,
-    status TEXT DEFAULT 'queued',
-    params JSONB DEFAULT '[]',
-    result JSONB DEFAULT '[]',
+    priority INTEGER,
+    status TEXT,
+    params JSONB,
+    result JSONB,
     created DATETIME DEFAULT CURRENT_TIMESTAMP
 );
-
-CREATE TRIGGER limit_tasks_after_insert
-AFTER INSERT ON tasks
-BEGIN
-    DELETE FROM tasks
-    WHERE id NOT IN (
-        SELECT id FROM tasks
-        ORDER BY created DESC
-        LIMIT 1000
-    );
-END;
 
 CREATE TABLE files (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     created DATETIME NOT NULL,
-    modified DATETIME NOT NULL,
-    task_id INTEGER NOT NULL,
-    FOREIGN KEY (task_id) REFERENCES tasks(id)
+    modified DATETIME NOT NULL
 );
 
-CREATE TABLE audiobooks (
+CREATE TABLE books (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    subtitle TEXT NOT NULL,
-    authors TEXT,
-    narrator TEXT,
+    title TEXT COLLATE NOCASE NOT NULL,
+    authors TEXT COLLATE NOCASE,
+    narrator TEXT COLLATE NOCASE,
+    isbn TEXT COLLATE NOCASE,
+    asin TEXT COLLATE NOCASE,
     genre TEXT,
-    isbn TEXT,
-    asin TEXT,
     language TEXT,
     year INTEGER,
     duration INTEGER,
     chapters JSONB,
-    cover BLOB,
-    file_path TEXT NOT NULL,
-    m4b_path TEXT,
-    created DATETIME DEFAULT CURRENT_TIMESTAMP
+    added DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE audiobooks_files (
-	audiobook_id INTEGER,
-	file_id INTEGER,
-	FOREIGN KEY (audiobook_id) REFERENCES audiobooks(id),
-	FOREIGN KEY (file_id) REFERENCES files(id)
-);
-
-CREATE TABLE libraries (
+CREATE TABLE images (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    import_path TEXT NOT NULL,
-    converted_path TEXT NOT NULL,
-    created DATETIME DEFAULT CURRENT_TIMESTAMP
+    name TEXT,
+    type TEXT,
+    size INTEGER,
+    book_id INTEGER,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE
 );
 
-CREATE TABLE logs (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    message TEXT NOT NULL,
-    created DATETIME DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE books_files (
+    book_id INTEGER,
+    file_id INTEGER,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+    FOREIGN KEY (file_id) REFERENCES files(id) ON DELETE CASCADE
 );
 
-CREATE TRIGGER limit_logs_after_insert
-AFTER INSERT ON logs
-BEGIN
-    DELETE FROM logs
+CREATE TABLE books_images (
+    book_id INTEGER NOT NULL,
+    image_id INTEGER NOT NULL,
+    FOREIGN KEY (book_id) REFERENCES books(id) ON DELETE CASCADE,
+    FOREIGN KEY (image_id) REFERENCES images(id) ON DELETE CASCADE
+);
+
+CREATE TRIGGER limit_tasks_after_insert
+AFTER INSERT ON tasks BEGIN
+    DELETE FROM tasks
     WHERE id NOT IN (
-        SELECT id FROM logs
+        SELECT id FROM tasks
         ORDER BY created DESC
-        LIMIT 1000
+        LIMIT 100000
     );
 END;
-
-CREATE TABLE properties (
-	name TEXT PRIMARY KEY,
-	value TEXT NOT NULL DEFAULT ''
-);
-
-CREATE TABLE users (
-	id INTEGER PRIMARY KEY AUTOINCREMENT,
-	name TEXT NOT NULL,
-	password_hash TEXT NOT NULL,
-	is_admin BOOLEAN NOT NULL DEFAULT false
-);

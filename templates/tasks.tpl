@@ -1,6 +1,6 @@
-<div id="content" class="activities">
-	<h2>Activity</h2>
-	<table id="libraries">
+<div id="content" class="tasks">
+	<h2>Tasks</h2>
+	<table id="tasks">
 		<thead>
 		<tr>
 		<th style="width:65%">Value</th>
@@ -9,7 +9,7 @@
 		</tr>
 		</thead>
 		<tbody>
-		{{ range .Activities }}
+		{{ range . }}
 		<tr>
 			<td>{{ .Value }}</td>
 			<td>{{ .Type }}</td>
