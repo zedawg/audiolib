@@ -4,9 +4,8 @@ import (
 	"embed"
 	"flag"
 	"log"
-	"os"
-	"path"
 
+	"github.com/mattn/go-sqlite3"
 	"github.com/zedawg/audiolib/config"
 	"github.com/zedawg/audiolib/db"
 )
@@ -18,57 +17,69 @@ var (
 	PublicFS embed.FS
 	//go:embed templates
 	TemplateFS embed.FS
-	//go:embed db/schema.sql
-	SQLFS embed.FS
 )
 
 var (
-	VERSION = "0.0.1"
-	DEV     bool
+	CONFIG_FILE string
+	DEV         bool
 )
 
 func init() {
+	flag.StringVar(&CONFIG_FILE, "config", "audiolib.config", "config json")
 	flag.BoolVar(&DEV, "dev", false, "development mode")
-	flag.StringVar(&config.Name, "config", "audiolib.config", "config json")
 	flag.Parse()
-
-	wd, _ := os.Getwd()
-	if !path.IsAbs(config.Name) {
-		config.Name = path.Join(wd, config.Name)
-	}
-	if _, err := os.Lstat(config.Name); err != nil {
-		if err = config.UseDefault(); err != nil {
-			log.Fatal(err)
-		}
-	}
-	if err := config.Parse(); err != nil {
-		log.Fatal(err)
-	}
+	config.Parse(CONFIG_FILE)
+	db.Init()
 }
 
 func main() {
-	err := db.Connect()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer db.Close()
-	b, _ := SQLFS.ReadFile("db/schema.sql")
-	db.DB.Exec(string(b))
-	//
 	log.SetFlags(0)
-	log.Println("config:", config.Name)
-	log.Println("database:", config.C.Database)
-	log.Println("app port:", config.C.Port)
-	log.Println("version:", VERSION)
-	log.Println("dev:", DEV)
+	log.Printf("dev=%v", DEV)
+	log.Println(config.C)
 	if DEV {
 		log.SetFlags(log.Lshortfile)
 	}
 	//
+	defer db.Close()
 	go StartHTTP()
 	//
 	for {
-		m := <-db.C
+		m := <-db.M
+		switch m.Table {
+		case "tasks":
+			switch m.Op {
+			case sqlite3.SQLITE_INSERT:
+			case sqlite3.SQLITE_DELETE:
+			case sqlite3.SQLITE_UPDATE:
+			default:
+			}
+		case "books":
+			switch m.Op {
+			case sqlite3.SQLITE_INSERT:
+			case sqlite3.SQLITE_DELETE:
+			case sqlite3.SQLITE_UPDATE:
+			default:
+			}
+
+		case "files":
+			switch m.Op {
+			case sqlite3.SQLITE_INSERT:
+			case sqlite3.SQLITE_DELETE:
+			case sqlite3.SQLITE_UPDATE:
+			default:
+			}
+
+		case "images":
+			switch m.Op {
+			case sqlite3.SQLITE_INSERT:
+			case sqlite3.SQLITE_DELETE:
+			case sqlite3.SQLITE_UPDATE:
+			default:
+			}
+
+		default:
+		}
+
 		log.Println(m)
 	}
 

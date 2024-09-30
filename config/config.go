@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"strings"
@@ -12,93 +13,105 @@ import (
 )
 
 var (
-	Name string
-	C    Config
-	M    sync.Mutex
+	C Config
+	M sync.Mutex
 )
 
 type Config struct {
-	Users    []User   `json:"users"`
-	Sources  []string `json:"sources"`
-	Port     string   `json:"port"`
-	Database string   `json:"database"`
+	Name     string           `json:"-"`
+	Port     string           `json:"port"`
+	Database string           `json:"database"`
+	Sources  []string         `json:"sources,omitempty"`
+	Users    map[string]*User `json:"users,omitempty"`
+}
+
+func (c Config) String() string {
+	return fmt.Sprintf("config=%v\ndatabase=%v\nport=%v", c.Name, c.Database, c.Port)
 }
 
 type User struct {
-	Name  string `json:"name"`
 	Hash  string `json:"hash"`
 	Admin bool   `json:"admin"`
 }
 
-func passwordHash(p string) string {
-	h, _ := bcrypt.GenerateFromPassword([]byte(p), bcrypt.DefaultCost)
+func passwordHash(pw string) string {
+	h, _ := bcrypt.GenerateFromPassword([]byte(pw), bcrypt.DefaultCost)
 	return string(h)
 }
 
-func UseDefault() error {
-	wd, _ := os.Getwd()
-	b, err := json.Marshal(Config{
-		Users: []User{User{
-			Name:  "admin",
-			Hash:  passwordHash("admin"),
-			Admin: true,
-		}},
-		Port:     ":8000",
-		Database: path.Join(wd, "audiolib.db"),
-	})
+func Parse(name string) {
+	wd, err := os.Getwd()
 	if err != nil {
-		return err
+		log.Fatal(err)
 	}
-	return os.WriteFile(Name, b, 0600)
-}
+	if !path.IsAbs(name) {
+		name = path.Join(wd, name)
+	}
+	C.Name = name
 
-func Parse() error {
-	b, err := os.ReadFile(Name)
-	if err != nil {
-		return err
+	if b, err := os.ReadFile(C.Name); err == nil {
+		if err = json.Unmarshal(b, &C); err != nil {
+			log.Fatal(err)
+		}
 	}
-	err = json.Unmarshal(b, &C)
-	if err != nil {
-		return err
+	if C.Users == nil {
+		C.Users = map[string]*User{}
 	}
-	return nil
+	if len(C.Port) == 0 {
+		C.Port = ":8000"
+	}
+	if len(C.Database) == 0 {
+		C.Database = path.Join(wd, "audiolib.db")
+	}
+	if len(C.Users) == 0 {
+		AddUser("admin", "", true)
+	}
+	if err := save(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func AddUser(name, password string, admin bool) error {
 	M.Lock()
-	for _, u := range C.Users {
-		if strings.ToLower(u.Name) == strings.ToLower(name) {
-			return fmt.Errorf("user '%v' already exists", name)
-		}
+	defer M.Unlock()
+	name = strings.ToLower(name)
+	if _, ok := C.Users[name]; ok {
+		return fmt.Errorf("user '%v' already exists", name)
 	}
-	C.Users = append(C.Users, User{
-		Name:  name,
-		Hash:  passwordHash(password),
-		Admin: admin,
-	})
-	M.Unlock()
-	return nil
+	C.Users[name] = &User{Hash: passwordHash(password), Admin: admin}
+	return save()
 }
 
-func LoginSuccess(name, password string) bool {
-	var h string
+func UpdatePassword(name, password string, admin bool) error {
+	name = strings.ToLower(name)
 	M.Lock()
-	for _, u := range C.Users {
-		if strings.ToLower(name) == strings.ToLower(u.Name) {
-			h = u.Hash
-			break
-		}
+	defer M.Unlock()
+	u, ok := C.Users[name]
+	if !ok {
+		return fmt.Errorf("user '%v' doesn't exist", name)
 	}
-	M.Unlock()
-	return bcrypt.CompareHashAndPassword([]byte(h), []byte(password)) == nil
+	u.Hash = passwordHash(password)
+	u.Admin = admin
+	return save()
 }
 
-func Save() error {
+func Login(name, password string) bool {
+	name = strings.ToLower(name)
 	M.Lock()
+	defer M.Unlock()
+	u, ok := C.Users[name]
+	if !ok {
+		return false
+	}
+	return bcrypt.CompareHashAndPassword([]byte(u.Hash), []byte(password)) == nil
+}
+
+func save() error {
+	M.Lock()
+	defer M.Unlock()
 	b, err := json.Marshal(C)
 	if err != nil {
 		return err
 	}
-	M.Unlock()
-	return os.WriteFile(Name, b, 0600)
+	return os.WriteFile(C.Name, b, 0600)
 }

@@ -16,6 +16,27 @@ var (
 	tpl *template.Template
 )
 
+func StartHTTP() {
+	if DEV {
+		http.HandleFunc("GET /assets/", http.HandlerFunc(DevFileHandlerFunc))
+		http.HandleFunc("GET /public/", http.HandlerFunc(DevFileHandlerFunc))
+	} else {
+		http.Handle("GET /assets/", http.FileServer(http.FS(AssetsFS)))
+		http.Handle("GET /public/", http.FileServer(http.FS(PublicFS)))
+	}
+	http.Handle("GET /{$}", http.HandlerFunc(HTMLHandlerFunc))
+	http.Handle("GET /books", http.HandlerFunc(BooksHandlerFunc))
+	http.Handle("GET /tasks", http.HandlerFunc(TasksHandlerFunc))
+	http.Handle("GET /config", http.HandlerFunc(ConfigHandlerFunc))
+	http.Handle("POST /search", http.HandlerFunc(SearchHandlerFunc))
+
+	http.HandleFunc("/ws", websocketHandler)
+
+	if err := http.ListenAndServe(config.C.Port, nil); err != nil {
+		log.Println(err)
+	}
+}
+
 func executeTemplate(w http.ResponseWriter, name string, data any) (err error) {
 	if DEV {
 		t, err := template.ParseGlob("templates/*")
@@ -30,7 +51,7 @@ func executeTemplate(w http.ResponseWriter, name string, data any) (err error) {
 	return tpl.ExecuteTemplate(w, name, data)
 }
 
-func getParam(r *http.Request, name, defaultValue string) string {
+func getUrlparam(r *http.Request, name, defaultValue string) string {
 	v := r.URL.Query().Get(name)
 	if len(v) == 0 {
 		return defaultValue
@@ -38,41 +59,27 @@ func getParam(r *http.Request, name, defaultValue string) string {
 	return v
 }
 
-func StartHTTP() {
-	if DEV {
-		http.HandleFunc("GET /assets/", http.HandlerFunc(DevFileHandlerFunc))
-		http.HandleFunc("GET /public/", http.HandlerFunc(DevFileHandlerFunc))
-	} else {
-		http.Handle("GET /assets/", http.FileServer(http.FS(AssetsFS)))
-		http.Handle("GET /public/", http.FileServer(http.FS(PublicFS)))
-	}
-	http.Handle("GET /{$}", http.HandlerFunc(BooksHandlerFunc))
-	http.Handle("GET /tasks", http.HandlerFunc(TasksHandlerFunc))
-	http.Handle("GET /settings", http.HandlerFunc(SettingsHandlerFunc))
-	http.Handle("GET /user", http.HandlerFunc(UserHandlerFunc))
-	http.Handle("POST /search", http.HandlerFunc(SearchHandlerFunc))
+func DevFileHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, path.Join(".", r.URL.Path))
+}
 
-	if err := http.ListenAndServe(config.C.Port, nil); err != nil {
+func HTMLHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	if err := executeTemplate(w, "html", config.C); err != nil {
 		log.Println(err)
 	}
 }
 
-func DevFileHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Cache-Control", "no-cache")
-	http.ServeFile(w, r, path.Join(".", r.URL.Path))
-}
-
 func BooksHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	sort := getParam(r, "sort", "added")
-	limit, _ := strconv.Atoi(getParam(r, "limit", "100"))
-	offset, _ := strconv.Atoi(getParam(r, "offset", "0"))
+	sort := getUrlparam(r, "sort", "added")
+	limit, _ := strconv.Atoi(getUrlparam(r, "limit", "100"))
+	offset, _ := strconv.Atoi(getUrlparam(r, "offset", "0"))
 
 	books, err := db.GetBooks(sort, limit, offset)
 	if err != nil {
 		log.Println(err)
 	}
 	if err := executeTemplate(w, "pages.books", books); err != nil {
-		fmt.Println(err)
+		log.Println(err)
 	}
 }
 
@@ -81,26 +88,9 @@ func TasksHandlerFunc(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Println(err)
 	}
-	if err = executeTemplate(w, "pages.tasks", tasks); err != nil {
-		fmt.Println(err)
-	}
-}
-
-func SettingsHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	if err := executeTemplate(w, "pages.settings", struct{}{}); err != nil {
+	tasks = append(tasks, &db.Task{Name: "scan name", Status: "50%"})
+	if err = executeTemplate(w, "tasks", tasks); err != nil {
 		log.Println(err)
-	}
-}
-
-func UserHandlerFunc(w http.ResponseWriter, r *http.Request) {
-	data := struct {
-		Name string
-	}{
-		Name: "user",
-	}
-	var err error
-	if err = executeTemplate(w, "pages.user", data); err != nil {
-		fmt.Println(err)
 	}
 }
 
@@ -136,3 +126,10 @@ func CreateLibraryHandlerFunc(w http.ResponseWriter, r *http.Request) {
 }
 
 func UpdateLibraryHandlerFunc(w http.ResponseWriter, r *http.Request) {}
+
+func ConfigHandlerFunc(w http.ResponseWriter, r *http.Request) {
+	if err := executeTemplate(w, "config", config.C); err != nil {
+		log.Println(err)
+	}
+
+}
