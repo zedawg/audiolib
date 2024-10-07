@@ -1,5 +1,4 @@
-module github.com/zedawg/audiolib
-
+module github.com/zedawg/librarian
 go 1.23.1
 
 require (

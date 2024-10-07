@@ -1,86 +1,52 @@
 package main
 
 import (
-	"embed"
-	"flag"
 	"log"
+	"time"
 
-	"github.com/mattn/go-sqlite3"
-	"github.com/zedawg/audiolib/config"
-	"github.com/zedawg/audiolib/db"
+	"github.com/zedawg/librarian/db"
+	"github.com/zedawg/librarian/http"
 )
+
+var Errors = make(chan error)
 
 var (
-	//go:embed assets
-	AssetsFS embed.FS
-	//go:embed public
-	PublicFS embed.FS
-	//go:embed templates
-	TemplateFS embed.FS
+	RUN_HTTP_SRV = 0
+	RUN_TASK_MGR = 0
 )
-
-var (
-	CONFIG_FILE string
-	DEV         bool
-)
-
-func init() {
-	flag.StringVar(&CONFIG_FILE, "config", "audiolib.config", "config json")
-	flag.BoolVar(&DEV, "dev", false, "development mode")
-	flag.Parse()
-	config.Parse(CONFIG_FILE)
-	db.Init()
-}
 
 func main() {
-	log.SetFlags(0)
-	log.Printf("dev=%v", DEV)
-	log.Println(config.C)
-	if DEV {
-		log.SetFlags(log.Lshortfile)
-	}
-	//
 	defer db.Close()
-	go StartHTTP()
-	//
+	go func() { Errors <- runHTTPSrv() }()
+	go func() { Errors <- runTaskMgr() }()
+
 	for {
-		m := <-db.M
-		switch m.Table {
-		case "tasks":
-			switch m.Op {
-			case sqlite3.SQLITE_INSERT:
-			case sqlite3.SQLITE_DELETE:
-			case sqlite3.SQLITE_UPDATE:
-			default:
+		select {
+		case err := <-Errors:
+			log.Println(err)
+			time.Sleep(3 * time.Second)
+			if RUN_HTTP_SRV == 0 {
+				go func() { Errors <- runHTTPSrv() }()
 			}
-		case "books":
-			switch m.Op {
-			case sqlite3.SQLITE_INSERT:
-			case sqlite3.SQLITE_DELETE:
-			case sqlite3.SQLITE_UPDATE:
-			default:
+			if RUN_TASK_MGR == 0 {
+				go func() { Errors <- runTaskMgr() }()
 			}
-
-		case "files":
-			switch m.Op {
-			case sqlite3.SQLITE_INSERT:
-			case sqlite3.SQLITE_DELETE:
-			case sqlite3.SQLITE_UPDATE:
-			default:
-			}
-
-		case "images":
-			switch m.Op {
-			case sqlite3.SQLITE_INSERT:
-			case sqlite3.SQLITE_DELETE:
-			case sqlite3.SQLITE_UPDATE:
-			default:
-			}
-
-		default:
 		}
-
-		log.Println(m)
 	}
+}
 
+func runTaskMgr() error {
+	RUN_TASK_MGR = 1
+	defer func() { RUN_TASK_MGR = 0 }()
+	for {
+		time.Sleep(5 * time.Second)
+	}
+	return nil
+}
+
+func runHTTPSrv() error {
+	RUN_HTTP_SRV = 1
+	defer func() { RUN_HTTP_SRV = 0 }()
+
+	return http.StartHTTP()
 }

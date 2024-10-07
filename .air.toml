@@ -3,10 +3,10 @@ testdata_dir = "testdata"
 tmp_dir = "tmp"
 
 [build]
-  args_bin = ["--dev"]
+  args_bin = ["--dev --data ~/librarian"]
   bin = "./tmp/main"
   cmd = "go build -o ./tmp/main ."
-  delay = 1000
+  delay = 500
   exclude_dir = ["tmp", "vendor", "testdata"]
   exclude_file = []
   exclude_regex = ["_test.go"]
@@ -21,7 +21,7 @@ tmp_dir = "tmp"
   poll = false
   poll_interval = 0
   post_cmd = []
-  pre_cmd = ["sass assets/style.scss assets/style.css --no-source-map"]
+  pre_cmd = ["sass http/assets/style.scss http/assets/style.css"]
   rerun = false
   rerun_delay = 500
   send_interrupt = false
@@ -47,5 +47,5 @@ tmp_dir = "tmp"
   proxy_port = 0
 
 [screen]
-  clear_on_rebuild = true
+  clear_on_rebuild = false
   keep_scroll = true

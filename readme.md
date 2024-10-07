@@ -1,19 +1,22 @@
-# Overview
+### Features
 
-AudioLib is a self hosted audiobook library solution built for simplicity, usability, using go, sqlite, htmx.
+- Auto-index audiobooks
+- Auto-convert mp3/wav/mpeg to m4b
+- Web browser, iOS player
+
+### Install
+
+#### Option #1: go cmd
 
 ```
-go get github.com/zedawg/audiolib
+go install -g github.com/zedawg/librarian
+librarian [sources...]
 ```
 
+#### Option #2: Docker
+
 ```
-Usage of audiolib:
-  -d string
-    	short for [dbname] (default "audiolib.db")
-  -dbname string
-    	path to sqlite database file (default "audiolib.db")
-  -p string
-    	short for [port] (default ":8080")
-  -port string
-    	http port (default ":8080")
+docker pull dockerhub.com/zedawg/librarian
+docker run -v data:/data -v source:/source -p 8000:8000 librarian:latest
 ```
+
