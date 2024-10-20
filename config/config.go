@@ -1,58 +1,58 @@
 package config
 
 import (
-	"errors"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"path"
+	"strings"
 )
 
 var (
-	Dev  = false // default
-	port = 8000  // default
-	data = ""
-	name = "db.sqlite"
-)
-
-var (
-	ErrBadConfig = errors.New("bad config: execute --help")
+	Dev     = false  // default
+	Port    = "8000" // default
+	dbname  = "db.sqlite"
+	home, _ = os.UserHomeDir()
+	dir     = path.Join(home, "librarian")
 )
 
 func init() {
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+	log.SetFlags(log.Ltime)
+	defineFlags()
+	parseFlags()
+	validate()
+}
 
-	flag.StringVar(&data, "data", data, "application data")
-	flag.StringVar(&data, "d", data, "short for --data")
-	flag.IntVar(&port, "port", port, "port")
-	flag.IntVar(&port, "p", port, "short for --port")
+func defineFlags() {
+	flag.StringVar(&dir, "dir", dir, "data directory")
+	flag.StringVar(&Port, "port", Port, "port")
 	flag.BoolVar(&Dev, "dev", Dev, "development mode")
-	flag.BoolVar(&Dev, "D", Dev, "short for --dev")
-	flag.Parse()
+}
 
-	if len(data) == 0 {
-		log.Fatal(ErrBadConfig)
+func parseFlags() {
+	testMode := false
+	for _, f := range os.Args[1:] {
+		if strings.Index(f, "test.") > -1 {
+			testMode = true
+		}
 	}
+	if !testMode {
+		flag.Parse()
+	}
+}
 
-	if !path.IsAbs(data) {
+func validate() {
+	if !path.IsAbs(dir) {
 		wd, _ := os.Getwd()
-		data = path.Join(wd, data)
+		dir = path.Join(wd, dir)
 	}
-
-	if _, err := os.Lstat(data); err != nil {
-		os.MkdirAll(data, 0700)
+	os.MkdirAll(dir, 0700)
+	if _, err := os.Lstat(dir); err != nil {
+		log.Println(err)
+		os.Exit(1)
 	}
-
-	log.Println("data path:", data)
-	log.Println("port:", port)
-	log.Println("dev mode:", Dev)
 }
 
 func DatabasePath() string {
-	return path.Join(data, name)
-}
-
-func Port() string {
-	return fmt.Sprintf(":%v", port)
+	return path.Join(dir, dbname)
 }
