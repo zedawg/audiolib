@@ -1,78 +1,72 @@
 package main
 
 import (
-	"encoding/json"
-	"path"
+	"fmt"
 	"testing"
-
-	"github.com/zedawg/librarian/config"
-	"github.com/zedawg/librarian/sql"
 )
 
-func TestNothing(t *testing.T) {
-	//
-	sql.Open(config.DatabasePath())
+// var q = "The Five Elements of Effective Thinking (Unabridged)"
 
-	if sql.DB == nil {
-		t.Error("db is nil")
-	}
+// var q = "The Curse of the High IQ"
 
-	var (
-		values []string
-		val    string
-	)
-	rows, err := sql.DB.Query(`SELECT json_object('id',id,'name',name,'root',root,'entries_details',entries_details) FROM directories_details LIMIT 3`)
+// var q = "Killing Crazy Horse: The Merciless Indian Wars in America"
+
+// var q = "Yongey Mingyur Rinpoche, Helen Tworkov"
+
+var q = "Robert Greene"
+
+func TestOpenLibrary(t *testing.T) {
+	// Open Library API Test
+	fmt.Println("Open Library API Results:")
+	olAudiobooks, err := searchOpenLibrary(q)
 	if err != nil {
-		t.Error(err)
-	}
-	defer rows.Close()
-	for rows.Next() {
-		if err := rows.Scan(&val); err != nil {
-			t.Error(err)
+		fmt.Println("Error:", err)
+	} else {
+		for _, book := range olAudiobooks {
+			fmt.Printf("Title: %s\nAuthors: %v\nInfoLink: %s\n\n",
+				book.Title, book.Authors, book.InfoLink)
 		}
-		values = append(values, val)
 	}
+}
 
-	type entry struct {
-		ID         int    `json:"id"`
-		Name       string `json:"name"`
-		Ext        string `json:"ext"`
-		DetailsStr string `json:"details"`
-		Details    map[string]interface{}
+func TestITunesSearch(t *testing.T) {
+	// iTunes Search API Test
+	fmt.Println("iTunes Search API Results:")
+	itAudiobooks, err := searchITunes(q)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		for _, book := range itAudiobooks {
+			fmt.Printf("Title: %s\nAuthors: %v\nDescription: %s\nInfoLink: %s\nCoverImage: %s\n\n",
+				book.Title, book.Authors, book.Description, book.InfoLink, book.CoverImage)
+		}
 	}
-	type dirdetails struct {
-		ID         int    `json:"id"`
-		Name       string `json:"name"`
-		Root       string `json:"root"`
-		EntriesStr string `json:"entries_details"`
-		Entries    []entry
-	}
+}
 
-	var (
-		dirs []dirdetails
-		dir  dirdetails
-	)
-
-	for _, val := range values {
-		if err := json.Unmarshal([]byte(val), &dir); err != nil {
-			t.Error(err)
-		}
-		if err := json.Unmarshal([]byte(dir.EntriesStr), &dir.Entries); err != nil {
-			t.Error(err)
-		}
-		for i := 0; i < len(dir.Entries); i++ {
-			if err := json.Unmarshal([]byte(dir.Entries[i].DetailsStr), &dir.Entries[i].Details); err != nil {
-				t.Error(err)
-			}
-		}
-		dirs = append(dirs, dir)
-	}
-
-	for _, dir := range dirs {
-		t.Logf("\t%s", path.Clean(path.Join(dir.Root, dir.Name)))
-		for _, file := range dir.Entries {
-			t.Logf("\t\t%s", file.Name)
+func TestLibriVoxSearch(t *testing.T) {
+	// LibriVox API Test
+	fmt.Println("LibriVox API Results:")
+	lvAudiobooks, err := searchLibriVox(q)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		for _, book := range lvAudiobooks {
+			fmt.Printf("Title: %s\nAuthors: %v\nDescription: %s\nInfoLink: %s\nCoverImage: %s\n\n",
+				book.Title, book.Authors, book.Description, book.InfoLink, book.CoverImage)
 		}
 	}
-	t.Log(len(dirs), dirs[1].Entries[0].Ext)
+}
+
+func TestArchiveOrgSearch(t *testing.T) {
+	// Archive.org API Test
+	fmt.Println("Archive.org API Results:")
+	aoAudiobooks, err := searchArchiveOrg(q)
+	if err != nil {
+		fmt.Println("Error:", err)
+	} else {
+		for _, book := range aoAudiobooks {
+			fmt.Printf("Title: %s\nAuthors: %v\nDescription: %s\nInfoLink: %s\nCoverImage: %s\n\n",
+				book.Title, book.Authors, book.Description, book.InfoLink, book.CoverImage)
+		}
+	}
 }

@@ -1,22 +1,19 @@
-### Features
+# GoAudiobook
 
-- Auto-index audiobooks
-- Auto-convert mp3/wav/mpeg to m4b
-- Web browser, iOS player
+GoAudiobook is a lightweight app
 
-### Install
+## Install
 
-#### Option #1: go cmd
+Local Install (using go tool)
 
 ```
-go install -g github.com/zedawg/librarian
-librarian [sources...]
+go install -g github.com/zedawg/goaudiobook
+goaudiobook -port 8080 -dir ~/downloads/audiobooks
 ```
 
-#### Option #2: Docker
+Using Docker (using docker)
 
 ```
-docker pull dockerhub.com/zedawg/librarian
-docker run -v data:/data -v source:/source -p 8000:8000 librarian:latest
+docker pull dockerhub.com/zedawg/goaudiobook
+docker run -v data:/data -p 80:8000 goaudiobook:latest
 ```
-

@@ -2,30 +2,18 @@ package server
 
 import (
 	"embed"
-	"fmt"
 	"log"
 	"net/http"
 	"path"
 	"strconv"
-	"strings"
 
 	"github.com/gorilla/websocket"
-	"github.com/zedawg/librarian/config"
-	"github.com/zedawg/librarian/sql"
+	"github.com/zedawg/goaudiobook/config"
+	"github.com/zedawg/goaudiobook/sql"
 )
 
-var (
-	//go:embed files
-	FS       embed.FS
-	upgrader = websocket.Upgrader{
-		ReadBufferSize:    4096,
-		WriteBufferSize:   4096,
-		EnableCompression: true,
-		CheckOrigin: func(r *http.Request) bool {
-			return true
-		},
-	}
-)
+//go:embed files
+var FS embed.FS
 
 func Listen() error {
 	http.Handle("/", FilesHandler())
@@ -44,27 +32,40 @@ func FilesHandler() http.Handler {
 	}
 }
 
-type WebsocketMessage struct {
-	Action Action         `json:"action"`
-	State  clientAppState `json:"state"`
-	Data   []byte         `json:"data"`
-	String string         `json:"string"`
+func ImagesHandler(w http.ResponseWriter, r *http.Request) {
+	id, err := strconv.Atoi(path.Base(r.URL.Path))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	b, err := sql.GetImageData(id)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+	} else {
+		w.Write(b)
+	}
 }
 
-type Action string
-
-const (
-	ActionUpdateState Action = "update-state"
-	ActionLogin       Action = "login"
-	ActionListDir     Action = "list-dir"
-)
-
-type clientAppState struct {
-	Session string
-	Sort    string
+var upgrader = websocket.Upgrader{
+	ReadBufferSize:    4096,
+	WriteBufferSize:   4096,
+	EnableCompression: true,
+	CheckOrigin: func(r *http.Request) bool {
+		return true
+	},
 }
 
 type WebSocketHandler struct{}
+
+type WebsocketMessage struct {
+	Action string `json:"action"`
+	State  struct {
+		Session string `json:"session"`
+		Sort    string `json:"sort"`
+	} `json:"state"`
+	Data   []byte `json:"data"`
+	String string `json:"string"`
+}
 
 func (hd *WebSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
@@ -83,23 +84,16 @@ func (hd *WebSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch m.Action {
-		case ActionUpdateState:
-		case ActionLogin:
-		case ActionListDir:
-			rows, err := sql.DB.Query(`SELECT json_object('id', id, 'name', name, 'entries', entries_details) FROM directories_details ORDER BY added DESC`)
+		case "update-state":
+		case "login":
+		case "list-audiobooks":
+			b, err := sql.GetAudiobooks()
 			if err != nil {
 				log.Println(err)
 			}
-			defer rows.Close()
-			dirs, dir := []string{}, ""
-			for rows.Next() {
-				if err := rows.Scan(&dir); err != nil {
-					continue
-				}
-				dirs = append(dirs, dir)
-			}
-			m.String = fmt.Sprintf("[%v]", strings.Join(dirs, ","))
+			m.String = string(b)
 		default:
+			log.Println(m.Action)
 		}
 
 		err = conn.WriteJSON(m)
@@ -108,27 +102,6 @@ func (hd *WebSocketHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-}
-
-// func AppHandler(w http.ResponseWriter, r *http.Request) {
-// 	if err := executeTemplate(w, "main", nil); err != nil {
-// 		log.Println(err)
-// 	}
-// }
-
-func ImagesHandler(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(path.Base(r.URL.Path))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	p := ""
-	err = sql.DB.QueryRow(`SELECT a.root || '/' || a.name || '/' || b.name FROM directories a JOIN entries b ON a.id=b.directory_id WHERE b.id=? AND b.ext IN ('jpg','jpeg','png')`, id).Scan(&p)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	http.ServeFile(w, r, path.Clean(p))
 }
 
 // func executeTemplate(w http.ResponseWriter, name string, data any) (err error) {
